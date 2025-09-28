@@ -4,10 +4,10 @@
 #        2webp cp <source> [destination]      - Copy structure to new location
 #        2webp cp <source> [destination] -A   - Copy structure + all other files
 
-# Quality settings (edit as needed)
-HEIC_QUALITY=86
-JPEG_QUALITY=94
-PNG_QUALITY=93
+# Quality settings (Settings are fine tuned based on experimentation)
+HEIC_QUALITY=78
+JPEG_QUALITY=50
+PNG_QUALITY=76
 
 # Tracking counters
 ERROR_COUNT=0
