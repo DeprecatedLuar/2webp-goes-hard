@@ -5,9 +5,9 @@
 #        2webp cp <source> [destination] -A   - Copy structure + all other files
 
 # Quality settings (edit as needed)
-HEIC_QUALITY=100
-JPEG_QUALITY=95
-PNG_QUALITY=95
+HEIC_QUALITY=86
+JPEG_QUALITY=94
+PNG_QUALITY=93
 
 # Tracking counters
 ERROR_COUNT=0
@@ -117,9 +117,9 @@ convert_type() {
         fi
 
         # Create temporary file for atomic operation
-        temp_file="${output_file}.tmp"
+        temp_file="${output_file%.webp}_tmp.webp"
 
-        if convert "$file" -auto-orient -quality "$quality" "$temp_file" 2>/dev/null; then
+        if convert "$file" -quality "$quality" "$temp_file" 2>/dev/null; then
             # Verify conversion succeeded and file has content
             if [ -s "$temp_file" ]; then
                 # Atomic move to final destination
