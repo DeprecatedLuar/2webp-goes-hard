@@ -1,0 +1,129 @@
+#!/bin/bash
+# Convert images to WebP with metadata preservation
+# Usage: 2webp ow <folder>                    - Replace originals in-place
+#        2webp cp <source> [destination]      - Copy structure to new location
+#        2webp cp <source> [destination] -A   - Copy structure + all other files
+
+# Quality settings (edit as needed)
+HEIC_QUALITY=100
+JPEG_QUALITY=95
+PNG_QUALITY=95
+
+# Error tracking
+ERROR_COUNT=0
+
+# Colors for errors only
+RED='\033[0;31m'
+NC='\033[0m'
+
+# set -e
+
+# Check/install ImageMagick
+if ! command -v convert >/dev/null; then
+    read -p "ImageMagick required. Install? (y/n): " choice
+    [ "$choice" = "y" ] || { echo -e "${RED}Error: ImageMagick required${NC}" >&2; exit 1; }
+    sudo apt update && sudo apt install -y imagemagick
+fi
+
+# Parse arguments
+COMMAND="$1"
+SOURCE_PATH="$2"
+DESTINATION="$3"
+COPY_ALL="$4"
+
+# Usage function
+usage() {
+    echo -e "${RED}Usage:${NC}"
+    echo "  $0 ow <folder>                    - Replace originals in-place"
+    echo "  $0 cp <source> [destination]      - Copy structure to new location"
+    echo "  $0 cp <source> [destination] -A   - Copy structure + all other files"
+    exit 1
+}
+
+# Validate command
+case "$COMMAND" in
+    "ow")
+        [ -z "$SOURCE_PATH" ] && usage
+        [ ! -d "$SOURCE_PATH" ] && { echo -e "${RED}Error: '$SOURCE_PATH' not found${NC}" >&2; exit 1; }
+        OUTPUT_PATH="$SOURCE_PATH"
+        MODE="overwrite"
+        ;;
+    "cp")
+        [ -z "$SOURCE_PATH" ] && usage
+        [ ! -d "$SOURCE_PATH" ] && { echo -e "${RED}Error: '$SOURCE_PATH' not found${NC}" >&2; exit 1; }
+
+        # Handle destination logic
+        if [ -z "$DESTINATION" ]; then
+            # Default: ~/2webp/foldername/
+            folder_name=$(basename "$SOURCE_PATH")
+            OUTPUT_PATH="$HOME/2webp/$folder_name"
+        else
+            # Check if destination is actually -A flag
+            if [ "$DESTINATION" = "-A" ]; then
+                folder_name=$(basename "$SOURCE_PATH")
+                OUTPUT_PATH="$HOME/2webp/$folder_name"
+                COPY_ALL="-A"
+            else
+                OUTPUT_PATH="$DESTINATION"
+            fi
+        fi
+
+        mkdir -p "$OUTPUT_PATH"
+        MODE="copy"
+        ;;
+    *)
+        usage
+        ;;
+esac
+
+# Copy non-image files if -A flag specified
+if [ "$COPY_ALL" = "-A" ] && [ "$MODE" = "copy" ]; then
+    echo "Copying non-image files..."
+    # Copy everything except images, preserving structure and metadata
+    rsync -av --exclude="*.jpg" --exclude="*.jpeg" --exclude="*.png" --exclude="*.heic" --exclude="*.heif" \
+          --exclude="*.JPG" --exclude="*.JPEG" --exclude="*.PNG" --exclude="*.HEIC" --exclude="*.HEIF" \
+          "$SOURCE_PATH/" "$OUTPUT_PATH/"
+fi
+
+# Convert function
+convert_type() {
+    local pattern="$1" quality="$2" name="$3"
+    eval "find \"$SOURCE_PATH\" -type f $pattern -print0" | while IFS= read -r -d '' file; do
+        relative_path="${file#$SOURCE_PATH/}"
+        output_file="$OUTPUT_PATH/${relative_path%.*}.webp"
+        mkdir -p "$(dirname "$output_file")"
+
+        # Handle duplicate filenames with incremental naming
+        if [ -f "$output_file" ]; then
+            base_name="${output_file%.*}"
+            extension="${output_file##*.}"
+            counter=1
+            while [ -f "${base_name}(${counter}).${extension}" ]; do
+                ((counter++))
+            done
+            output_file="${base_name}(${counter}).${extension}"
+        fi
+
+        if convert "$file" -auto-orient -quality "$quality" "$output_file" 2>/dev/null; then
+            touch -r "$file" "$output_file"
+            [ "$MODE" = "overwrite" ] && rm "$file"
+        else
+            echo -e "${RED}Failed: $relative_path${NC}" >&2
+            ((ERROR_COUNT++))
+        fi
+    done
+    echo "$name files completed"
+}
+
+# Process by type
+convert_type '\( -iname "*.heic" -o -iname "*.heif" \)' "$HEIC_QUALITY" "HEIC"
+convert_type '\( -iname "*.jpg" -o -iname "*.jpeg" \)' "$JPEG_QUALITY" "JPEG"
+convert_type '-iname "*.png"' "$PNG_QUALITY" "PNG"
+
+# Final status message
+if [ $ERROR_COUNT -eq 0 ]; then
+    echo "Conversion complete"
+else
+    echo "Conversion complete | $ERROR_COUNT files failed"
+fi
+[ "$MODE" = "copy" ] && echo "Output: $OUTPUT_PATH"
