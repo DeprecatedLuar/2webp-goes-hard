@@ -102,7 +102,9 @@ convert_type() {
     local pattern="$1" quality="$2" name="$3"
     echo "Processing $name files..."
     while IFS= read -r -d '' file; do
-        relative_path="${file#$SOURCE_PATH/}"
+        # Ensure SOURCE_PATH ends with /
+        source_with_slash="${SOURCE_PATH%/}/"
+        relative_path="${file#$source_with_slash}"
         output_file="$OUTPUT_PATH/${relative_path%.*}.webp"
         mkdir -p "$(dirname "$output_file")"
 
@@ -124,7 +126,7 @@ convert_type() {
             echo -e "${RED}Failed: $relative_path${NC}" >&2
             ((ERROR_COUNT++))
         fi
-    done < <(find "$SOURCE_PATH" -type f $pattern -print0)
+    done < <(eval "find \"$SOURCE_PATH\" -type f $pattern -print0")
     echo -e "${GREEN}$name files completed${NC}"
 }
 
