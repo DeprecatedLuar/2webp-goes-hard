@@ -12,9 +12,13 @@ PNG_QUALITY=95
 # Error tracking
 ERROR_COUNT=0
 
-# Colors for errors only
+# Colors
+GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
+
+# Handle Ctrl+C
+trap 'echo -e "\n${RED}Operation cancelled${NC}"; exit 1' INT
 
 # set -e
 
@@ -76,18 +80,27 @@ case "$COMMAND" in
         ;;
 esac
 
+# Check for rsync if -A flag is used
+if [ "$COPY_ALL" = "-A" ] && ! command -v rsync >/dev/null; then
+    read -p "rsync required for -A flag. Install? (y/n): " choice
+    [ "$choice" = "y" ] || { echo -e "${RED}Error: rsync required for -A flag${NC}" >&2; exit 1; }
+    sudo apt update && sudo apt install -y rsync
+fi
+
 # Copy non-image files if -A flag specified
 if [ "$COPY_ALL" = "-A" ] && [ "$MODE" = "copy" ]; then
     echo "Copying non-image files..."
     # Copy everything except images, preserving structure and metadata
-    rsync -av --exclude="*.jpg" --exclude="*.jpeg" --exclude="*.png" --exclude="*.heic" --exclude="*.heif" \
+    rsync -a --exclude="*.jpg" --exclude="*.jpeg" --exclude="*.png" --exclude="*.heic" --exclude="*.heif" \
           --exclude="*.JPG" --exclude="*.JPEG" --exclude="*.PNG" --exclude="*.HEIC" --exclude="*.HEIF" \
           "$SOURCE_PATH/" "$OUTPUT_PATH/"
+    echo -e "${GREEN}Non-image files copied${NC}"
 fi
 
 # Convert function
 convert_type() {
     local pattern="$1" quality="$2" name="$3"
+    echo "Processing $name files..."
     eval "find \"$SOURCE_PATH\" -type f $pattern -print0" | while IFS= read -r -d '' file; do
         relative_path="${file#$SOURCE_PATH/}"
         output_file="$OUTPUT_PATH/${relative_path%.*}.webp"
@@ -112,7 +125,7 @@ convert_type() {
             ((ERROR_COUNT++))
         fi
     done
-    echo "$name files completed"
+    echo -e "${GREEN}$name files completed${NC}"
 }
 
 # Process by type

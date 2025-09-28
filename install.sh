@@ -5,6 +5,11 @@ REPO_URL="https://raw.githubusercontent.com/DeprecatedLuar/2webp-goes-hard/main"
 INSTALL_DIR="$HOME/.local/bin"
 SCRIPT_NAME="2webp"
 
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 echo "Installing 2webp goes hard..."
 
 # Create install directory if it doesn't exist
@@ -12,7 +17,7 @@ mkdir -p "$INSTALL_DIR"
 
 # Download the script
 if ! command -v curl >/dev/null 2>&1; then
-    echo "curl is required for installation. Install it, or cry about it on issues." >&2
+    echo -e "${RED}curl is required for installation. Install it, or cry about it on issues.${NC}" >&2
     exit 1
 fi
 
@@ -38,10 +43,11 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
     echo "Either restart your shell or run: source $SHELL_RC, or not, I'm not your mom"
 else
-    echo "Well done champ! $INSTALL_DIR is already in your PATH"
+    echo -e "${GREEN}Well done champ! $INSTALL_DIR is already in your PATH${NC}"
 fi
 
-echo "2webp installed successfully. Idk, go convert some stuff now"
+echo -e "${GREEN}2webp installed successfully. Idk, go convert some stuff now${NC}"
+echo
 echo "Usage: 2webp ow <folder>                    - Replace originals in-place"
 echo "       2webp cp <source> [destination]      - Copy structure to new location (or home folder)"
 echo "       2webp cp <source> [destination] -A   - Copy structure + all other files"
