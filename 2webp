@@ -91,9 +91,9 @@ fi
 if [ "$COPY_ALL" = "-A" ] && [ "$MODE" = "copy" ]; then
     echo "Copying non-image files..."
     # Copy everything except images, preserving structure and metadata
-    rsync -a --exclude="*.jpg" --exclude="*.jpeg" --exclude="*.png" --exclude="*.heic" --exclude="*.heif" \
+    (cd "$SOURCE_PATH" && rsync -a --exclude="*.jpg" --exclude="*.jpeg" --exclude="*.png" --exclude="*.heic" --exclude="*.heif" \
           --exclude="*.JPG" --exclude="*.JPEG" --exclude="*.PNG" --exclude="*.HEIC" --exclude="*.HEIF" \
-          "$SOURCE_PATH/" "$OUTPUT_PATH/"
+          . "$OUTPUT_PATH/")
     echo -e "${GREEN}Non-image files copied${NC}"
 fi
 
@@ -101,7 +101,7 @@ fi
 convert_type() {
     local pattern="$1" quality="$2" name="$3"
     echo "Processing $name files..."
-    eval "find \"$SOURCE_PATH\" -type f $pattern -print0" | while IFS= read -r -d '' file; do
+    while IFS= read -r -d '' file; do
         relative_path="${file#$SOURCE_PATH/}"
         output_file="$OUTPUT_PATH/${relative_path%.*}.webp"
         mkdir -p "$(dirname "$output_file")"
@@ -124,7 +124,7 @@ convert_type() {
             echo -e "${RED}Failed: $relative_path${NC}" >&2
             ((ERROR_COUNT++))
         fi
-    done
+    done < <(find "$SOURCE_PATH" -type f $pattern -print0)
     echo -e "${GREEN}$name files completed${NC}"
 }
 
