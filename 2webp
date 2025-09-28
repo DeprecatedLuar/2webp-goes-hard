@@ -9,8 +9,10 @@ HEIC_QUALITY=100
 JPEG_QUALITY=95
 PNG_QUALITY=95
 
-# Error tracking
+# Tracking counters
 ERROR_COUNT=0
+SKIPPED_COUNT=0
+CONVERTED_COUNT=0
 
 # Colors
 GREEN='\033[0;32m'
@@ -108,22 +110,31 @@ convert_type() {
         output_file="$OUTPUT_PATH/${relative_path%.*}.webp"
         mkdir -p "$(dirname "$output_file")"
 
-        # Handle duplicate filenames with incremental naming
+        # Skip if exact file already exists (resumption support)
         if [ -f "$output_file" ]; then
-            base_name="${output_file%.*}"
-            extension="${output_file##*.}"
-            counter=1
-            while [ -f "${base_name}(${counter}).${extension}" ]; do
-                ((counter++))
-            done
-            output_file="${base_name}(${counter}).${extension}"
+            ((SKIPPED_COUNT++))
+            continue
         fi
 
-        if convert "$file" -auto-orient -quality "$quality" "$output_file" 2>/dev/null; then
-            touch -r "$file" "$output_file"
-            [ "$MODE" = "overwrite" ] && rm "$file"
+        # Create temporary file for atomic operation
+        temp_file="${output_file}.tmp"
+
+        if convert "$file" -auto-orient -quality "$quality" "$temp_file" 2>/dev/null; then
+            # Verify conversion succeeded and file has content
+            if [ -s "$temp_file" ]; then
+                # Atomic move to final destination
+                mv "$temp_file" "$output_file"
+                touch -r "$file" "$output_file"
+                [ "$MODE" = "overwrite" ] && rm "$file"
+                ((CONVERTED_COUNT++))
+            else
+                echo -e "${RED}Failed: $relative_path (empty output)${NC}" >&2
+                rm -f "$temp_file"
+                ((ERROR_COUNT++))
+            fi
         else
             echo -e "${RED}Failed: $relative_path${NC}" >&2
+            rm -f "$temp_file"
             ((ERROR_COUNT++))
         fi
     done < <(eval "find \"$SOURCE_PATH\" -type f $pattern -print0")
@@ -135,10 +146,9 @@ convert_type '\( -iname "*.heic" -o -iname "*.heif" \)' "$HEIC_QUALITY" "HEIC"
 convert_type '\( -iname "*.jpg" -o -iname "*.jpeg" \)' "$JPEG_QUALITY" "JPEG"
 convert_type '-iname "*.png"' "$PNG_QUALITY" "PNG"
 
-# Final status message
-if [ $ERROR_COUNT -eq 0 ]; then
-    echo "Conversion complete"
-else
-    echo "Conversion complete | $ERROR_COUNT files failed"
-fi
+# Final summary
+TOTAL_PROCESSED=$((CONVERTED_COUNT + SKIPPED_COUNT + ERROR_COUNT))
+echo "Conversion complete"
+echo ""
+echo "$TOTAL_PROCESSED processed | $CONVERTED_COUNT converted | $SKIPPED_COUNT skipped | $ERROR_COUNT failed"
 [ "$MODE" = "copy" ] && echo "Output: $OUTPUT_PATH"
